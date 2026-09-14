@@ -1,0 +1,115 @@
+# NOTE: `start-dev` is used here to keep this reference deployment simple and
+# self-contained. For a real production rollout, build a custom Keycloak image
+# with `kc.sh build`, run in production mode behind TLS, and point it at an
+# external Postgres database instead of the embedded dev store.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm-import
+  namespace: gov-portal
+data:
+  realm-export.json: |
+    {
+      "realm": "gov-portal",
+      "enabled": true,
+      "sslRequired": "none",
+      "registrationAllowed": false,
+      "roles": {
+        "realm": [
+          { "name": "citizen", "description": "Can submit and view their own service requests" },
+          { "name": "case-worker", "description": "Can view and triage all service requests" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "gov-portal-frontend",
+          "name": "Gov Portal Frontend",
+          "enabled": true,
+          "publicClient": true,
+          "protocol": "openid-connect",
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "redirectUris": ["*"],
+          "webOrigins": ["*"]
+        }
+      ],
+      "users": [
+        {
+          "username": "jane.citizen",
+          "enabled": true,
+          "email": "jane.citizen@example.com",
+          "emailVerified": true,
+          "credentials": [{ "type": "password", "value": "citizen123", "temporary": false }],
+          "realmRoles": ["citizen"]
+        },
+        {
+          "username": "worker.bob",
+          "enabled": true,
+          "email": "worker.bob@example.com",
+          "emailVerified": true,
+          "credentials": [{ "type": "password", "value": "worker123", "temporary": false }],
+          "realmRoles": ["case-worker"]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: gov-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:25.0
+          args: ["start-dev", "--import-realm"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: gov-portal-secrets
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+      volumes:
+        - name: realm-import
+          configMap:
+            name: keycloak-realm-import
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: gov-portal
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080

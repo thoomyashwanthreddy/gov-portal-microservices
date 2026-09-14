@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: gov-portal-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/govportal
+    username: govportal
+    password: govportal
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/gov-portal
+
+keycloak:
+  token-uri: http://localhost:8081/realms/gov-portal/protocol/openid-connect/token
+  client-id: gov-portal-frontend
+  client-secret: ""
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.govportal: INFO

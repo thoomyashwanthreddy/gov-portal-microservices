@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gov-portal-config
+  namespace: gov-portal
+data:
+  SPRING_PROFILES_ACTIVE: "kubernetes"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/govportal"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://keycloak:8080/realms/gov-portal"
+  KEYCLOAK_TOKEN_URI: "http://keycloak:8080/realms/gov-portal/protocol/openid-connect/token"
+  KEYCLOAK_CLIENT_ID: "gov-portal-frontend"

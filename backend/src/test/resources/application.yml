@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:govportal;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+  flyway:
+    enabled: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/gov-portal
+
+keycloak:
+  token-uri: http://localhost:8081/realms/gov-portal/protocol/openid-connect/token
+  client-id: gov-portal-frontend
+  client-secret: ""

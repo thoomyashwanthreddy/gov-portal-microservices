@@ -1,0 +1,122 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gov-portal-postgres
+    environment:
+      POSTGRES_DB: govportal
+      POSTGRES_USER: govportal
+      POSTGRES_PASSWORD: govportal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U govportal -d govportal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - gov-portal-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: gov-portal-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - gov-portal-net
+
+  # Single-node Kafka in KRaft mode (no Zookeeper needed).
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: gov-portal-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9094:9094"
+    networks:
+      - gov-portal-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: gov-portal-kafka-ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: gov-portal
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8085:8080"
+    depends_on:
+      - kafka
+    networks:
+      - gov-portal-net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: gov-portal-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    networks:
+      - gov-portal-net
+
+  notification-service:
+    build:
+      context: ./notification-service
+    container_name: gov-portal-notification-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8082:8082"
+    depends_on:
+      - kafka
+    networks:
+      - gov-portal-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: gov-portal-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - gov-portal-net
+
+networks:
+  gov-portal-net:
+    driver: bridge
+
+volumes:
+  postgres-data:

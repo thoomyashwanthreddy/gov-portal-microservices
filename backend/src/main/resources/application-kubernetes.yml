@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/govportal
+
+  kafka:
+    bootstrap-servers: kafka:9092
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/gov-portal
+
+keycloak:
+  token-uri: http://keycloak:8080/realms/gov-portal/protocol/openid-connect/token
+  client-id: gov-portal-frontend
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
